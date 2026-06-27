@@ -1,0 +1,5 @@
+# Local preview helper only — not part of the deployed static app
+serve.cjs
+node_modules/
+.DS_Store
+.vercel

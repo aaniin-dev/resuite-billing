@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#16213a">
+<title>RESUITE Time Tracking</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+  :root {
+    --navy: #16213a; --navy-2: #1f3157; --blue: #3b6fd4;
+    --green: #1f9d63; --green-d: #157a4c; --red: #c0392b;
+    --amber: #c98a16;
+    --bg: #f4f6fa; --card: #fff; --line: #e3e8f0; --text: #1a2233; --muted: #6b7688;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { max-width: 560px; margin: 0 auto; padding: 0 0 90px; min-height: 100vh; }
+
+  header { background: var(--navy); color: #fff; padding: 16px 18px; position: sticky; top: 0; z-index: 20; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  header .hrow { display: flex; justify-content: space-between; align-items: flex-start; }
+  header .brand { font-size: 12px; letter-spacing: 3px; opacity: .65; font-weight: 600; }
+  header .title { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .clockwrap { text-align: right; }
+  .liveclock { font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 700; letter-spacing: 1px; }
+  .tz { font-size: 9px; opacity: .7; letter-spacing: .5px; margin-top: 1px; }
+
+  .nextappt { margin-top: 12px; background: rgba(255,255,255,.10); border-radius: 10px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .nextappt .na-lbl { font-size: 9px; letter-spacing: 1.5px; background: var(--blue); color: #fff; padding: 3px 6px; border-radius: 5px; font-weight: 700; }
+  .nextappt .na-text { font-size: 13px; opacity: .95; }
+
+  .statusbar { display: flex; gap: 10px; margin-top: 12px; }
+  .statusbar .box { flex: 1; background: rgba(255,255,255,.10); border-radius: 12px; padding: 9px 12px; }
+  .statusbar .box .lbl { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; opacity: .7; }
+  .statusbar .box .val { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .sync-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 4px 8px; border-radius: 20px; margin-top: 10px; cursor: pointer; }
+  .sync-chip.ok { background: rgba(31,157,99,.25); }
+  .sync-chip.off { background: rgba(201,138,22,.30); }
+  .sync-chip.pend { background: rgba(192,57,43,.30); }
+
+  .wrap { padding: 16px; }
+
+  .checkin-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .ci-top { display: flex; justify-content: space-between; align-items: center; }
+  .ci-title { font-size: 15px; font-weight: 700; }
+  .ci-status { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .ci-status.on { color: var(--green-d); }
+  .ci-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .ci-ints { display: flex; gap: 8px; margin: 12px 0; }
+  .ci-ints button { flex: 1; padding: 10px 0; border-radius: 9px; border: 1px solid var(--line); background: #f7f9fc; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); }
+  .ci-ints button.sel { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .ci-toggle { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--green); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .ci-toggle.on { background: var(--red); }
+
+  .client { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+  .client.running { border-color: var(--green); box-shadow: 0 0 0 2px rgba(31,157,99,.18); }
+  .client .top { padding: 14px 16px 6px; display: flex; justify-content: space-between; align-items: flex-start; }
+  .client .num { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+  .client .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .client .hrs { text-align: right; font-size: 20px; font-weight: 700; color: var(--green-d); }
+  .client .hrs small { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  .live { margin: 0 16px 10px; padding: 10px 12px; background: #eef7f1; border-radius: 10px; display: none; align-items: center; justify-content: space-between; }
+  .client.running .live { display: flex; }
+  .live .clock { font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; color: var(--green-d); }
+  .live .note { font-size: 11px; color: var(--muted); }
+
+  .actions { display: flex; gap: 8px; padding: 8px 16px 14px; }
+  .btn { border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; flex: 1; color: #fff; }
+  .btn.start { background: var(--green); }
+  .btn.stop { background: var(--red); }
+  .btn.add { background: var(--blue); }
+  .btn.ghost { background: #eef1f6; color: var(--text); flex: 0 0 auto; padding: 12px 14px; }
+
+  .entries { border-top: 1px solid var(--line); padding: 4px 16px; display: none; }
+  .client.open .entries { display: block; }
+  .entry { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; font-size: 13px; border-bottom: 1px solid #f0f2f6; }
+  .entry:last-child { border-bottom: none; }
+  .entry .desc { color: var(--muted); }
+  .entry .e-right { display: flex; align-items: center; gap: 10px; }
+  .entry .e-bill { font-weight: 700; }
+  .entry .dot { font-size: 10px; }
+  .entry .dot.sent { color: var(--green); }
+  .entry .dot.pend { color: var(--amber); }
+  .entry .resend { color: var(--blue); font-size: 11px; cursor: pointer; font-weight: 600; }
+  .entry .del { color: var(--red); font-size: 16px; cursor: pointer; padding: 0 2px; }
+  .toggle-entries { width: 100%; background: none; border: none; color: var(--blue); font-size: 12px; padding: 8px 0; cursor: pointer; font-weight: 600; }
+
+  .addclient { background: var(--card); border: 1px dashed var(--line); border-radius: 14px; padding: 16px; }
+  .addclient button { background: var(--navy); color: #fff; border: none; border-radius: 10px; padding: 13px 18px; font-size: 15px; font-weight: 700; width: 100%; cursor: pointer; }
+
+  .footer-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .footer-actions button { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: 14px; }
+
+  /* Overlays */
+  .overlay { position: fixed; inset: 0; background: rgba(20,28,45,.55); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+  .overlay.show { display: flex; }
+  .sheet { background: #fff; width: 100%; max-width: 560px; border-radius: 18px 18px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 92vh; overflow: auto; }
+  .sheet h3 { font-size: 18px; margin-bottom: 14px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+  .field input { width: 100%; padding: 13px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; }
+  .row { display: flex; gap: 10px; }
+  .row .field { flex: 1; }
+  .sheet-btns { display: flex; gap: 10px; margin-top: 6px; }
+  .sheet-btns button { flex: 1; padding: 13px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .sheet-btns .cancel { background: #eef1f6; color: var(--text); }
+  .sheet-btns .save { background: var(--green); color: #fff; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: -6px; margin-bottom: 12px; line-height: 1.5; }
+
+  .seg { display: flex; background: #eef1f6; border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+  .seg button { flex: 1; border: none; background: none; padding: 9px; font-size: 13px; font-weight: 600; color: var(--muted); border-radius: 8px; cursor: pointer; }
+  .seg button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .mode { display: none; } .mode.on { display: block; }
+  .preview { background: #eef7f1; border: 1px solid #cfe9da; border-radius: 10px; padding: 12px; margin-bottom: 14px; text-align: center; }
+  .preview .calc { font-size: 13px; color: var(--green-d); font-variant-numeric: tabular-nums; }
+  .preview .pts { font-size: 26px; font-weight: 700; color: var(--green-d); margin-top: 2px; }
+  .preview .pts small { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-head h3 { margin: 0; }
+  .cal-nav { background: #eef1f6; border: none; width: 38px; height: 38px; border-radius: 9px; font-size: 20px; cursor: pointer; }
+  .cal-dow { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; margin-bottom: 4px; }
+  .cal-dow span { text-align: center; font-size: 10px; color: var(--muted); font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+  .cal-cell { aspect-ratio: 1; border-radius: 8px; background: #f7f9fc; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; border: 1px solid transparent; }
+  .cal-cell.empty { background: transparent; cursor: default; }
+  .cal-cell.has { background: #e7f0fb; }
+  .cal-cell.today { border-color: var(--blue); font-weight: 700; }
+  .cal-cell.sel { background: var(--blue); color: #fff; }
+  .cal-cell .ch { font-size: 9px; color: var(--green-d); font-weight: 700; margin-top: 1px; }
+  .cal-cell.sel .ch { color: #fff; }
+  #calDayDetail { margin-top: 14px; }
+  #calDayDetail .dd-day { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  #calDayDetail .dd-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f0f2f6; }
+  #calDayDetail .dd-tot { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; padding-top: 8px; }
+
+  .step { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid #f0f2f6; }
+  .step .chk { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--line); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; cursor: pointer; }
+  .step.done .chk { background: var(--green); border-color: var(--green); }
+  .step .s-lbl { flex: 1; font-size: 14px; }
+  .step.done .s-lbl { color: var(--muted); text-decoration: line-through; }
+  .step .s-id { font-size: 10px; color: var(--muted); }
+  .step .x { color: var(--red); cursor: pointer; font-size: 15px; padding: 0 4px; }
+  .cp { display: inline-flex; align-items: center; gap: 6px; background: #eef1f6; border-radius: 20px; padding: 6px 12px; margin: 4px 6px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .cp .x { color: var(--red); cursor: pointer; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div><div class="brand">RESUITE</div><div class="title">Time Tracking</div></div>
+    <div class="clockwrap"><div class="liveclock" id="liveClock">--:--:--</div><div class="tz" id="tzLabel"></div></div>
+  </div>
+  <div class="nextappt" id="nextApptBar"><span class="na-lbl">NEXT APPT</span><span class="na-text" id="nextApptText">Tap to set…</span></div>
+  <div class="statusbar">
+    <div class="box"><div class="lbl">Entries Sent</div><div class="val" id="totEntries">0</div></div>
+    <div class="box"><div class="lbl">Pending</div><div class="val" id="totPending">0</div></div>
+  </div>
+  <span class="sync-chip off" id="syncChip">⚙ Connect spreadsheet</span>
+</header>
+
+<div class="wrap">
+  <div id="clientList"></div>
+  <div class="addclient"><button id="addClientBtn">+ New Client #</button></div>
+  <div class="footer-actions">
+    <button id="calBtn">📅 Calendar</button>
+    <button id="sendAllBtn">⬆ Send Pending</button>
+  </div>
+  <div class="footer-actions">
+    <button id="exportBtn">⬇ Export CSV</button>
+    <button id="resetBtn">Clear Sent Entries</button>
+  </div>
+</div>
+
+<!-- New client number sheet -->
+<div class="overlay" id="clientOverlay">
+  <div class="sheet">
+    <h3 id="clientSheetTitle">New Client #</h3>
+    <div class="field">
+      <label>Client number (auto-generated, no names stored)</label>
+      <input id="clientNum" type="text" inputmode="numeric" autocomplete="off">
+    </div>
+    <div class="hint">A random number is generated for privacy. The firm maps this number to the real client separately — the phone never holds client info. You can edit it to match an existing matter number if you prefer.</div>
+    <div class="sheet-btns">
+      <button class="cancel" id="clientCancel">Cancel</button>
+      <button class="save" id="clientSave">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Time entry sheet -->
+<div class="overlay" id="timeOverlay">
+  <div class="sheet">
+    <h3 id="timeSheetTitle">Log Time</h3>
+    <div class="seg">
+      <button id="segClock" class="on">Clock In / Out</button>
+      <button id="segDur">Duration</button>
+    </div>
+    <div class="mode on" id="modeClock">
+      <div class="row">
+        <div class="field"><label>Start time</label><input id="clkStart" type="time"></div>
+        <div class="field"><label>End time</label><input id="clkEnd" type="time"></div>
+      </div>
+    </div>
+    <div class="mode" id="modeDur">
+      <div class="row">
+        <div class="field"><label>Hours</label><input id="manHours" type="number" inputmode="numeric" placeholder="0"></div>
+        <div class="field"><label>Minutes</label><input id="manMins" type="number" inputmode="numeric" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="preview" id="timePreview">
+      <div class="calc" id="pvCalc">Enter a start and end time</div>
+      <div class="pts" id="pvPts">0.0 <small>pts</small></div>
+    </div>
+    <div class="hint">Rounds up to the nearest 0.1 hr (6-min unit), per legal billing.</div>
+    <div class="sheet-btns">
+      <button class="cancel" id="timeCancel">Cancel</button>
+      <button class="save" id="timeSave">Add &amp; Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings / webhook sheet -->
+<div class="overlay" id="cfgOverlay">
+  <div class="sheet">
+    <h3>Spreadsheet Connection</h3>
+    <div class="field">
+      <label>Send-to URL (Power Automate / webhook)</label>
+      <input id="cfgUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..." autocomplete="off">
+    </div>
+    <div class="hint">Paste the URL Copilot gives you when it sets up the flow (see the Copilot prompt). Every time entry POSTs <code>{clientNumber, date, start, stop, minutes, points}</code> as JSON to this URL. If left blank, the app stores entries locally and you can Export CSV instead.</div>
+    <div class="sheet-btns">
+      <button class="cancel" id="cfgCancel">Cancel</button>
+      <button class="save" id="cfgSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar sheet -->
+<div class="overlay" id="calOverlay">
+  <div class="sheet">
+    <div class="cal-head"><button id="calPrev" class="cal-nav">‹</button><h3 id="calMonth">Month</h3><button id="calNext" class="cal-nav">›</button></div>
+    <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDayDetail"></div>
+    <div class="sheet-btns"><button class="cancel" id="calClose">Close</button></div>
+  </div>
+</div>
+
+<script>
+/* ---------- Billing core: minutes -> tenths, rounded UP (6-min units) ---------- */
+function minutesToTenths(min) { return min <= 0 ? 0 : Math.ceil(min / 6) / 10; }
+
+/* ---------- State ---------- */
+var STORE_KEY = "resuite_v2";
+var state = load();
+function defaultSteps() {
+  // label is LOCAL ONLY (never sent). Only the numeric id, yes/no, date, time are transmitted.
+  return [ { id: 1, label: "Logged today's hours" },
+           { id: 2, label: "Sent what was promised" },
+           { id: 3, label: "Booked next meeting" } ];
+}
+function load() {
+  try { var r = localStorage.getItem(STORE_KEY); if (r) { var s = JSON.parse(r);
+    if (!s.steps) s.steps = defaultSteps();
+    if (!s.checkpoints) s.checkpoints = ["09:00","13:00","17:00"];
+    if (!s.done) s.done = {}; if (!s.fired) s.fired = {};
+    if (!s.checkin) s.checkin = { on: false, intervalMin: 30, next: null };
+    return s; } } catch (e) {}
+  return { clients: [], nextAppt: "", webhook: "", steps: defaultSteps(), checkpoints: ["09:00","13:00","17:00"], done: {}, fired: {}, remindersOn: false, checkin: { on: false, intervalMin: 30, next: null } };
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function randNum() {
+  var n;
+  do { n = String(Math.floor(100000 + Math.random()*900000)); }
+  while (state.clients.some(function(c){ return c.number === n; }));
+  return n;
+}
+
+/* ---------- Helpers ---------- */
+function getClient(id) { return state.clients.find(function(c){ return c.id === id; }); }
+function clientHours(c) { return c.entries.reduce(function(s,e){ return s + e.tenths; }, 0); }
+function pendingCount() {
+  var n = 0; state.clients.forEach(function(c){ c.entries.forEach(function(e){ if (!e.sent) n++; }); }); return n;
+}
+function hhmm(ts) { var d = new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+function pad(x){ return (x<10?"0":"")+x; }
+function hmDur(min){ var m=Math.round(min); return Math.floor(m/60)+"h "+pad(m%60)+"m"; }
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];}); }
+
+/* ---------- Entry + send ---------- */
+function addEntry(c, minutes, start, end, source) {
+  var e = { id: uid(), at: Date.now(), minutes: minutes, tenths: minutesToTenths(minutes), start: start||"", end: end||"", source: source||"", sent: false };
+  c.entries.push(e);
+  trySend(c, e);
+  return e;
+}
+function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+// One-way transmit. Body carries ONLY numbers, yes/no, dates, times — never names or labels.
+function postJSON(obj) {
+  return fetch(state.webhook, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify(obj) });
+}
+function payload(c, e) {
+  return { type: "time", clientNumber: c.number, date: new Date(e.at).toISOString().slice(0,10),
+           start: e.start||"", stop: e.end||"", minutes: Math.round(e.minutes), points: e.tenths };
+}
+function trySend(c, e) {
+  if (!state.webhook) { render(); return; }
+  // text/plain avoids a CORS preflight; the flow parses the JSON body. Opaque response, so mark optimistically.
+  postJSON(payload(c, e))
+    .then(function(){ e.sent = true; save(); render(); })
+    .catch(function(){ e.sent = false; save(); render(); });
+}
+function sendAll() {
+  if (!state.webhook) { openCfg(); return; }
+  state.clients.forEach(function(c){ c.entries.forEach(function(e){ if (!e.sent) trySend(c, e); }); });
+}
+
+/* ---------- Render ---------- */
+var listEl = document.getElementById("clientList");
+function render() {
+  listEl.innerHTML = "";
+  if (state.clients.length === 0) listEl.innerHTML = '<div class="empty">No client numbers yet.<br>Tap “New Client #” to start tracking.</div>';
+
+  var totE = 0, totP = 0;
+  state.clients.forEach(function(c) {
+    var h = clientHours(c); totE += c.entries.length;
+    c.entries.forEach(function(e){ if (!e.sent) totP++; });
+    var div = document.createElement("div");
+    div.className = "client" + (c.open?" open":"");
+    var entriesHtml = c.entries.slice().reverse().map(function(e){
+      var when = (e.start && e.end) ? (e.start+"–"+e.end) : (Math.round(e.minutes)+" min");
+      return '<div class="entry"><div class="desc">'+fmtD(e.at)+' · '+when+'</div>'+
+        '<div class="e-right"><span class="e-bill">'+e.tenths.toFixed(1)+'</span>'+
+        (e.sent ? '<span class="dot sent">● sent</span>' : '<span class="dot pend">● pending</span><span class="resend" data-resend="'+c.id+'|'+e.id+'">send</span>')+
+        '<span class="del" data-del="'+c.id+'|'+e.id+'">×</span></div></div>';
+    }).join("");
+    div.innerHTML =
+      '<div class="top"><div><div class="num">Client #'+escapeHtml(c.number)+'</div>'+
+        '<div class="sub">'+c.entries.length+' entr'+(c.entries.length===1?'y':'ies')+' sent</div></div>'+
+        '<div class="hrs">'+h.toFixed(1)+' <small>pts</small></div></div>'+
+      '<div class="actions">'+
+        '<button class="btn add" data-log="'+c.id+'">+ Time Entry</button>'+
+        '<button class="btn ghost" data-del-client="'+c.id+'">🗑</button>'+
+      '</div>'+
+      (c.entries.length ? '<button class="toggle-entries" data-toggle="'+c.id+'">'+(c.open?"Hide":"Show "+c.entries.length+" ")+'entries</button><div class="entries">'+entriesHtml+'</div>' : "");
+    listEl.appendChild(div);
+  });
+
+  document.getElementById("totEntries").textContent = totE;
+  document.getElementById("totPending").textContent = totP;
+  renderSync();
+  save();
+}
+function fmtD(t){ return new Date(t).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+
+function renderSync() {
+  var chip = document.getElementById("syncChip");
+  var pend = pendingCount();
+  if (!state.webhook) { chip.className = "sync-chip off"; chip.textContent = "⚙ Connect spreadsheet"; }
+  else if (pend > 0) { chip.className = "sync-chip pend"; chip.textContent = "↻ "+pend+" pending — tap to send"; }
+  else { chip.className = "sync-chip ok"; chip.textContent = "✓ Synced to spreadsheet"; }
+}
+
+/* ---------- Event delegation ---------- */
+document.body.addEventListener("click", function(ev){
+  var t = ev.target, a;
+  if (a = t.getAttribute && t.getAttribute("data-log")) return openTime(a);
+  if (a = t.getAttribute && t.getAttribute("data-toggle")) { var c=getClient(a); c.open=!c.open; return render(); }
+  if (a = t.getAttribute && t.getAttribute("data-del-client")) { if(confirm("Delete Client #"+getClient(a).number+" and its entries?")){ state.clients=state.clients.filter(function(x){return x.id!==a;}); render(); } return; }
+  if (a = t.getAttribute && t.getAttribute("data-resend")) { var p=a.split("|"); var cc=getClient(p[0]); var e=cc.entries.find(function(x){return x.id===p[1];}); if(e) trySend(cc,e); return; }
+  if (a = t.getAttribute && t.getAttribute("data-del")) { var q=a.split("|"); var c2=getClient(q[0]); c2.entries=c2.entries.filter(function(x){return x.id!==q[1];}); return render(); }
+});
+
+/* ---------- New client sheet ---------- */
+var clientOverlay = document.getElementById("clientOverlay");
+document.getElementById("addClientBtn").onclick = function(){ document.getElementById("clientNum").value = randNum(); clientOverlay.classList.add("show"); };
+document.getElementById("clientCancel").onclick = function(){ clientOverlay.classList.remove("show"); };
+document.getElementById("clientSave").onclick = function(){
+  var num = document.getElementById("clientNum").value.trim();
+  if (!num) { num = randNum(); }
+  state.clients.push({ id: uid(), number: num, entries: [], running: false, startedAt: null, open: false });
+  clientOverlay.classList.remove("show"); render();
+};
+
+/* ---------- Time sheet ---------- */
+var logId=null, timeMode="clock", timeOverlay=document.getElementById("timeOverlay");
+var elClkStart=document.getElementById("clkStart"), elClkEnd=document.getElementById("clkEnd");
+var elManH=document.getElementById("manHours"), elManM=document.getElementById("manMins");
+function openTime(id){ logId=id; document.getElementById("timeSheetTitle").textContent="Log Time · Client #"+getClient(id).number; elClkStart.value=""; elClkEnd.value=""; elManH.value=""; elManM.value=""; setMode("clock"); timeOverlay.classList.add("show"); }
+function setMode(m){ timeMode=m; document.getElementById("segClock").classList.toggle("on",m==="clock"); document.getElementById("segDur").classList.toggle("on",m==="dur"); document.getElementById("modeClock").classList.toggle("on",m==="clock"); document.getElementById("modeDur").classList.toggle("on",m==="dur"); updatePreview(); }
+document.getElementById("segClock").onclick=function(){ setMode("clock"); };
+document.getElementById("segDur").onclick=function(){ setMode("dur"); };
+function clockToMin(v){ if(!v||v.indexOf(":")<0) return null; var p=v.split(":"); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+function currentMinutes(){
+  if (timeMode==="clock"){ var s=clockToMin(elClkStart.value), e=clockToMin(elClkEnd.value); if(s===null||e===null) return null; var d=e-s; if(d<0) d+=1440; return d; }
+  var h=parseFloat(elManH.value)||0, m=parseFloat(elManM.value)||0; var t=h*60+m; return t>0?t:null;
+}
+function updatePreview(){
+  var mins=currentMinutes(), calcEl=document.getElementById("pvCalc"), ptsEl=document.getElementById("pvPts");
+  if(mins===null){ calcEl.textContent=(timeMode==="clock")?"Enter a start and end time":"Enter hours / minutes"; ptsEl.innerHTML="0.0 <small>pts</small>"; return; }
+  var pts=minutesToTenths(mins);
+  calcEl.textContent=(timeMode==="clock")?(elClkEnd.value+" − "+elClkStart.value+" = "+mins+" min"):(mins+" min");
+  ptsEl.innerHTML=pts.toFixed(1)+" <small>pts</small>";
+}
+[elClkStart,elClkEnd,elManH,elManM].forEach(function(el){ el.addEventListener("input",updatePreview); });
+document.getElementById("timeCancel").onclick=function(){ timeOverlay.classList.remove("show"); };
+document.getElementById("timeSave").onclick=function(){
+  var mins=currentMinutes();
+  var st=(timeMode==="clock")?elClkStart.value:""; var en=(timeMode==="clock")?elClkEnd.value:"";
+  if(mins&&mins>0) addEntry(getClient(logId),mins,st,en,timeMode);
+  timeOverlay.classList.remove("show"); render();
+};
+
+/* ---------- Settings / webhook ---------- */
+var cfgOverlay=document.getElementById("cfgOverlay");
+function openCfg(){ document.getElementById("cfgUrl").value=state.webhook||""; cfgOverlay.classList.add("show"); }
+document.getElementById("syncChip").onclick=openCfg;
+document.getElementById("cfgCancel").onclick=function(){ cfgOverlay.classList.remove("show"); };
+document.getElementById("cfgSave").onclick=function(){ state.webhook=document.getElementById("cfgUrl").value.trim(); save(); cfgOverlay.classList.remove("show"); render(); };
+document.getElementById("sendAllBtn").onclick=sendAll;
+
+/* ---------- Live clock ---------- */
+function tzAbbr(){ try{ var s=new Date().toLocaleTimeString("en-US",{timeZoneName:"short"}); var m=s.match(/[A-Z]{2,5}$/); return m?m[0]:""; }catch(e){ return ""; } }
+function updateClock(){ var now=new Date(); document.getElementById("liveClock").textContent=now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"}); var z=""; try{ z=Intl.DateTimeFormat().resolvedOptions().timeZone||""; }catch(e){} document.getElementById("tzLabel").textContent=(tzAbbr()+" · "+z).replace(/_/g," "); }
+setInterval(updateClock,1000); updateClock();
+
+/* ---------- Next appointment ---------- */
+function renderNextAppt(){ document.getElementById("nextApptText").textContent=state.nextAppt?state.nextAppt:"Tap to set…"; }
+document.getElementById("nextApptBar").onclick=function(){ var v=prompt("Next appointment:",state.nextAppt||""); if(v!==null){ state.nextAppt=v.trim(); save(); renderNextAppt(); } };
+
+/* ---------- Export CSV (number + time fields only) ---------- */
+function csvCell(v){ v=String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+document.getElementById("exportBtn").onclick=function(){
+  var rows=[["Client Number","Date","Start","Stop","Minutes","Points"]];
+  state.clients.forEach(function(c){ c.entries.slice().sort(function(a,b){return a.at-b.at;}).forEach(function(e){
+    rows.push([c.number,new Date(e.at).toLocaleDateString(),e.start||"",e.end||"",Math.round(e.minutes),e.tenths.toFixed(1)]);
+  });});
+  var csv=rows.map(function(r){return r.map(csvCell).join(",");}).join("\r\n");
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); var url=URL.createObjectURL(blob);
+  var a=document.createElement("a"); a.href=url; a.download="resuite-hours-"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(function(){URL.revokeObjectURL(url);},1000);
+};
+
+/* ---------- Clear sent entries ---------- */
+document.getElementById("resetBtn").onclick=function(){
+  if(!confirm("Remove entries already sent to the spreadsheet? Pending entries are kept.")) return;
+  state.clients.forEach(function(c){ c.entries=c.entries.filter(function(e){return !e.sent;}); });
+  render();
+};
+
+/* ---------- Calendar ---------- */
+var calOverlay=document.getElementById("calOverlay"); var calView=new Date(); calView.setDate(1); var calSel=null;
+function dateKey(d){ return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function todayKey(){ return dateKey(new Date()); }
+function dayMap(){ var map={}; state.clients.forEach(function(c){ c.entries.forEach(function(e){ var k=dateKey(new Date(e.at)); if(!map[k]) map[k]={hrs:0,items:[]}; map[k].hrs+=e.tenths; map[k].items.push({num:c.number,start:e.start,end:e.end,mins:e.minutes,tenths:e.tenths}); }); }); return map; }
+function renderCal(){
+  var y=calView.getFullYear(), m=calView.getMonth();
+  document.getElementById("calMonth").textContent=calView.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  var startDow=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), map=dayMap(), grid=document.getElementById("calGrid");
+  grid.innerHTML="";
+  for(var i=0;i<startDow;i++){ var x=document.createElement("div"); x.className="cal-cell empty"; grid.appendChild(x); }
+  for(var d=1;d<=days;d++){ var key=y+"-"+(m+1)+"-"+d, info=map[key], cell=document.createElement("div");
+    cell.className="cal-cell"+(info?" has":"")+(key===todayKey()?" today":"")+(key===calSel?" sel":"");
+    cell.innerHTML="<span>"+d+"</span>"+(info?'<span class="ch">'+info.hrs.toFixed(1)+'</span>':""); cell.setAttribute("data-day",key); grid.appendChild(cell); }
+  renderDayDetail(map);
+}
+function renderDayDetail(map){
+  var box=document.getElementById("calDayDetail");
+  if(!calSel||!map[calSel]){ box.innerHTML='<div class="dd-day" style="color:var(--muted)">Tap a highlighted day to see entries.</div>'; return; }
+  var info=map[calSel], p=calSel.split("-"), dd=new Date(p[0],p[1]-1,p[2]);
+  var html='<div class="dd-day">'+dd.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})+'</div>';
+  info.items.forEach(function(it){ var t=(it.start&&it.end)?(it.start+"–"+it.end):(Math.round(it.mins)+" min"); html+='<div class="dd-row"><span>Client #'+escapeHtml(it.num)+' · '+t+'</span><span>'+it.tenths.toFixed(1)+' pts</span></div>'; });
+  html+='<div class="dd-tot"><span>Total</span><span>'+info.hrs.toFixed(1)+' hrs</span></div>';
+  box.innerHTML=html;
+}
+document.getElementById("calBtn").onclick=function(){ calView=new Date(); calView.setDate(1); calSel=todayKey(); renderCal(); calOverlay.classList.add("show"); };
+document.getElementById("calClose").onclick=function(){ calOverlay.classList.remove("show"); };
+document.getElementById("calPrev").onclick=function(){ calView.setMonth(calView.getMonth()-1); renderCal(); };
+document.getElementById("calNext").onclick=function(){ calView.setMonth(calView.getMonth()+1); renderCal(); };
+document.getElementById("calGrid").addEventListener("click",function(ev){ var cell=ev.target.closest(".cal-cell"); if(!cell||cell.classList.contains("empty")) return; calSel=cell.getAttribute("data-day"); renderCal(); });
+
+/* ---------- Backdrop close ---------- */
+[clientOverlay,timeOverlay,cfgOverlay,calOverlay].forEach(function(o){ o.addEventListener("click",function(e){ if(e.target===o) o.classList.remove("show"); }); });
+
+renderNextAppt(); render();
+</script>
+</body>
+</html>
