@@ -25,6 +25,8 @@
   .adrow{display:flex;align-items:center;justify-content:space-between;padding:13px 2px;border-bottom:1px solid var(--ln);font-size:15px}
   .progt{height:3px;background:rgba(22,33,58,.12);border-radius:3px;width:330px;overflow:hidden}.progf{height:100%;width:0;background:var(--nv)}
   .pulse{animation:p 1.6s ease-in-out infinite}@keyframes p{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .shotmode .cap,.shotmode .progt{display:none}
+  .cap-capture .layer,.cap-capture .swov,.cap-capture .adtoast{transition:none!important}
 </style>
 </head>
 <body>
@@ -112,7 +114,26 @@
     at(18000,function(){toast.classList.remove("show");only("cta");cap.style.opacity=0;});
     at(DUR+2500,run); // loop
   }
-  run();
+  window.RESUITE_renderAt=function(t){
+    document.body.classList.add("cap-capture");
+    prog.style.width=Math.min(100,t/DUR*100)+"%";
+    sw.classList.remove("up");toast.classList.remove("show");cap.style.display="";cap.style.opacity=1;
+    if(t<4000){only("intake");cap.textContent="Unbilled minutes are lost money.";tEl.textContent="00:00:00";pEl.textContent="0.0";}
+    else if(t<9000){only("dash");cap.textContent="One tap to start the clock.";}
+    else if(t<13000){only("dash");cap.textContent="Switch matters — never miss a tenth.";sw.classList.add("up");}
+    else if(t<18000){only("dash");cap.textContent="Stops sync straight to your billing.";if(t>=13600)toast.classList.add("show");}
+    else {only("cta");cap.style.display="none";}
+    if(t>=4000&&t<=18000){var min=(t-4000)/14000*24,s=Math.floor(min*60);tEl.textContent="00:"+pad(Math.floor(s/60))+":"+pad(s%60);pEl.textContent=(Math.ceil(min/6)/10).toFixed(1);}
+  };
+  var SHOT=new URLSearchParams(location.search).get("shot");
+  if(SHOT){
+    document.body.classList.add("shotmode");
+    if(SHOT==="intake"){only("intake");}
+    else if(SHOT==="dash"){only("dash");tEl.textContent="00:14:32";pEl.textContent="0.4";}
+    else if(SHOT==="switch"){only("dash");tEl.textContent="00:14:32";pEl.textContent="0.4";sw.classList.add("up");}
+    else if(SHOT==="sync"){only("dash");tEl.textContent="00:20:18";pEl.textContent="0.6";toast.classList.add("show");}
+    else if(SHOT==="cta"){only("cta");cap.style.display="none";}
+  } else { run(); }
 })();
 </script>
 </body>
