@@ -176,8 +176,9 @@
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <div class="cmodal" id="chkScrim"><div class="cbox">
   <div class="ceye"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
-  <div class="ctitle" id="chkTitle">Still working?</div>
+  <div class="ctitle" id="chkTitle">Are you still there?</div>
   <div class="csub" id="chkSub"></div>
+  <div class="csub" id="chkCount" style="margin-top:8px;font-variant-numeric:tabular-nums;color:var(--stop)"></div>
   <button class="sbtn" id="chkGo" style="margin-top:18px">Yes, keep going</button>
   <button class="sbtn soft" id="chkStop" style="margin-top:10px">Pause timer</button>
 </div></div>
@@ -565,15 +566,24 @@ function openFollow(){
 }
 
 /* ===== Check-in reminder ("Are you still working?") ===== */
+var chkInt=null, CHK_GRACE=180000; // 3-minute grace, then auto-pause (Netflix style)
+function stopCheckInTimer(){ if(chkInt){clearInterval(chkInt);chkInt=null;} }
+function hideCheckIn(){ stopCheckInTimer(); document.getElementById("chkScrim").classList.remove("show"); }
 function fireCheckIn(ms){
-  document.getElementById("chkSub").innerHTML="";
   var c=activeClient();
-  document.getElementById("chkTitle").textContent="Still working?";
+  document.getElementById("chkTitle").textContent="Are you still there?";
   document.getElementById("chkSub").innerHTML=(c?"Client #<b>"+escapeHtml(c.number)+"</b> · ":"")+hmDur(ms/60000)+" tracked so far.";
+  var deadline=Date.now()+CHK_GRACE, cd=document.getElementById("chkCount");
+  function tick(){
+    var r=Math.max(0,deadline-Date.now()), s=Math.ceil(r/1000);
+    cd.textContent="Auto-pausing in "+Math.floor(s/60)+":"+pad(s%60);
+    if(r<=0){hideCheckIn();pauseTimer();toast("Paused — no response");}
+  }
+  tick(); stopCheckInTimer(); chkInt=setInterval(tick,1000);
   document.getElementById("chkScrim").classList.add("show");
 }
-document.getElementById("chkGo").onclick=function(){document.getElementById("chkScrim").classList.remove("show");};
-document.getElementById("chkStop").onclick=function(){document.getElementById("chkScrim").classList.remove("show");pauseTimer();};
+document.getElementById("chkGo").onclick=function(){hideCheckIn();};
+document.getElementById("chkStop").onclick=function(){hideCheckIn();pauseTimer();};
 
 /* top-bar wiring */
 document.getElementById("settingsBtn").onclick=openSettings;
