@@ -201,11 +201,15 @@ function load(){
     if(typeof s.checkin.intervalMin!=="number")s.checkin.intervalMin=30;
     if(!s.log)s.log=[];
     if(typeof s.lastExport==="undefined")s.lastExport=null;
+    if(!s.weekly)s.weekly={on:true};
+    if(typeof s.weeklyPrompt==="undefined")s.weeklyPrompt=null;
+    if(!s.archives)s.archives=[];
+    if(typeof s.copilotUrl==="undefined")s.copilotUrl="";
     if(!s.timer)s.timer={clientId:null,running:false,startedAt:null,accMs:0};
     if(typeof s.activeId==="undefined")s.activeId=null;
     if(!s.billing)s.billing={customerId:null,email:"",status:"none",active:false};
     return s;}}catch(e){}
-  return{clients:[],nextAppt:"",webhook:"",lastExport:null,steps:defaultSteps(),checkpoints:["09:00","13:00","17:00"],
+  return{clients:[],nextAppt:"",webhook:"",lastExport:null,weekly:{on:true},weeklyPrompt:null,archives:[],copilotUrl:"",steps:defaultSteps(),checkpoints:["09:00","13:00","17:00"],
     done:{},fired:{},remindersOn:false,checkin:{on:true,intervalMin:30},log:[],
     timer:{clientId:null,running:false,startedAt:null,accMs:0},activeId:null,
     billing:{customerId:null,email:"",status:"none",active:false}};
@@ -484,8 +488,21 @@ function openSettings(){
     '<div class="sub" style="margin-bottom:8px">Export</div>'+
     '<div class="erow"><div>'+(state.lastExport?('Last exported · <b>'+new Date(state.lastExport).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})+'</b>'):'Not exported yet')+'</div></div>'+
     '<div class="hint" style="font-size:12px;color:var(--muted);margin:6px 0 14px">Data stays on this device — nothing is sent automatically. You export a file and import it into Microsoft; each export stamps an "Exported At" date.</div>'+
-    '<button class="sbtn dark" id="cfgExport">Export now</button>');
+    '<button class="sbtn dark" id="cfgExport">Export now</button>'+
+    '<div class="sub" style="margin:20px 0 8px">Weekly export reminder</div>'+
+    '<div class="seg" id="wkSeg"><button data-wk="on"'+(state.weekly.on?' class="on"':'')+'>On · Fri 12pm</button><button data-wk="off"'+(!state.weekly.on?' class="on"':'')+'>Off</button></div>'+
+    '<div class="hint" style="font-size:12px;color:var(--muted);margin:-8px 0 6px">A Friday nudge: "export your hours for the week?" — with a quick recap of what to automate next week.</div>'+
+    '<div class="sub" style="margin:20px 0 8px">Your records — weekly copies (kept here)</div>'+
+    (state.archives&&state.archives.length?state.archives.slice(0,6).map(function(a,i){return '<div class="erow"><div>'+a.label+' <span class="ed">· '+a.rows+' rows'+(a.recap?' · note':'')+(a.sent?' · sent':'')+'</span></div><button data-arch="'+i+'" style="background:none;border:none;color:#3b6fd4;font-size:13px;font-weight:600;cursor:pointer">download</button></div>';}).join(""):'<div class="hint" style="font-size:12px;color:var(--muted)">No copies yet — one is saved here every time you export.</div>')+
+    '<div class="sub" style="margin:20px 0 8px">Connect to Copilot spreadsheet (optional)</div>'+
+    '<div class="fld"><label>Copilot intake URL</label><input id="cpUrl" type="url" placeholder="https://...logic.azure.com/..." autocomplete="off"></div>'+
+    '<div class="hint" style="font-size:12px;color:var(--muted);margin:-4px 0 12px">Safeguard: sends <b>only when you export</b> — never automatically — and a copy is always kept here, numbers only. Leave blank to stay export-only.</div>'+
+    '<button class="sbtn soft" id="cpSave">Save connection</button>');
   document.getElementById("cfgExport").onclick=function(){exportCSV();closeSheet();};
+  document.getElementById("cpUrl").value=state.copilotUrl||"";
+  document.getElementById("cpSave").onclick=function(){state.copilotUrl=document.getElementById("cpUrl").value.trim();save();closeSheet();renderSync();toast(state.copilotUrl?"Connection saved":"Connection cleared");};
+  sheet.querySelectorAll("#wkSeg [data-wk]").forEach(function(el){el.onclick=function(){state.weekly.on=(el.getAttribute("data-wk")==="on");save();sheet.querySelectorAll("#wkSeg [data-wk]").forEach(function(x){x.classList.toggle("on",x===el);});toast(state.weekly.on?"Weekly reminder on":"Weekly reminder off");};});
+  sheet.querySelectorAll("[data-arch]").forEach(function(el){el.onclick=function(){var a=state.archives[parseInt(el.getAttribute("data-arch"),10)];if(a)downloadCSV(a.csv,a.fname||("resuite-"+a.label));};});
   var sb=document.getElementById("billSub");if(sb)sb.onclick=openPricing;
   var bm=document.getElementById("billManage");if(bm)bm.onclick=openPortal;
   sheet.querySelectorAll("#chkSeg [data-iv]").forEach(function(el){el.onclick=function(){
@@ -500,7 +517,8 @@ function openSettings(){
 /* CSV export (UNCHANGED columns/logic) */
 function csvCell(v){v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function isoFull(ts){var d=new Date(ts);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes());}
-function exportCSV(){
+function downloadCSV(csv,name){var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=name+".csv";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);}
+function exportCSV(recap){
   var now=Date.now(),stamp=isoFull(now);
   var rows=[["Type","Client Number","Date","Start","Stop","Minutes","Points","Time","Category","Exported At"]];
   state.clients.forEach(function(c){c.entries.slice().sort(function(a,b){return a.at-b.at;}).forEach(function(e){
@@ -511,11 +529,18 @@ function exportCSV(){
     else rows.push([o.type||"action",o.clientNumber||"",o.date||"","","","","",o.time||"",(o.category||o.stepId||""),stamp]);
     l.exportedAt=now;});
   var csv=rows.map(function(r){return r.map(csvCell).join(",");}).join("\r\n");
-  var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob);
-  var a=document.createElement("a");a.href=url;a.download="resuite-export-"+new Date().toISOString().slice(0,10)+".csv";
-  document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  state.lastExport=now;save();renderSync();toast("Exported "+(rows.length-1)+" rows");
+  var fname="resuite-export-"+new Date().toISOString().slice(0,10);
+  downloadCSV(csv,fname);
+  // Keep a copy in here (your records) — always, regardless of connection
+  state.archives=state.archives||[];
+  state.archives.unshift({at:now,label:new Date(now).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}),rows:rows.length-1,csv:csv,fname:fname,recap:recap||"",sent:false});
+  if(state.archives.length>26)state.archives.pop();
+  // Safeguarded connection: only sends on export (never automatically); copy already kept
+  if(state.copilotUrl){fetch(state.copilotUrl,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:csv}).then(function(){var a0=state.archives[0];if(a0)a0.sent=true;save();}).catch(function(){});}
+  state.lastExport=now;save();renderSync();
+  toast("Exported "+(rows.length-1)+" rows · copy saved"+(state.copilotUrl?" + sent":""));
 }
+function weekStats(){var since=Date.now()-7*24*3600*1000,pts=0,count=0,cl={};state.clients.forEach(function(c){c.entries.forEach(function(e){if(e.at>=since){pts+=e.tenths;count++;cl[c.number]=1;}});});return{pts:pts,count:count,clients:Object.keys(cl).length};}
 
 /* calendar */
 var calView=new Date();calView.setDate(1);var calSel=null;
@@ -580,6 +605,26 @@ function fireCheckIn(ms){
 document.getElementById("chkGo").onclick=function(){hideCheckIn();};
 document.getElementById("chkStop").onclick=function(){hideCheckIn();pauseTimer();};
 
+/* ===== Weekly export reminder (Friday 12pm) + recap ===== */
+function openWeekly(){
+  state.weeklyPrompt=Date.now();save();
+  var w=weekStats();
+  openSheet('<h3>Weekly export — Friday</h3><div class="sub">Would you like to export your hours for the week?</div>'+
+    '<div class="pvbar"><div class="p">'+w.pts.toFixed(1)+' pts</div><div class="c">'+w.count+' entries · '+w.clients+' client'+(w.clients===1?"":"s")+' this week</div></div>'+
+    '<div class="fld"><label>Anything missed this week to automate next week? (optional)</label><input id="wkRecap" type="text" placeholder="e.g. auto-send engagement letters"></div>'+
+    '<div style="display:flex;gap:10px"><button class="sbtn soft" id="wkLater">Remind me later</button><button class="sbtn dark" id="wkGo">Export &amp; save copy</button></div>');
+  document.getElementById("wkLater").onclick=closeSheet;
+  document.getElementById("wkGo").onclick=function(){var r=(document.getElementById("wkRecap").value||"").trim();exportCSV(r);closeSheet();};
+}
+function checkWeekly(){
+  if(!state.weekly||!state.weekly.on)return;
+  if(document.getElementById("scrim").classList.contains("show"))return;
+  var d=new Date();
+  if(d.getDay()!==5||d.getHours()<12)return; // Friday, noon or later
+  if(state.weeklyPrompt&&(Date.now()-state.weeklyPrompt)<6*24*3600*1000)return; // once per week
+  openWeekly();
+}
+
 /* top-bar wiring */
 document.getElementById("settingsBtn").onclick=openSettings;
 document.getElementById("listBtn").onclick=openList;
@@ -588,6 +633,8 @@ document.getElementById("calBtn").onclick=openCal;
 handleCheckoutReturn();
 refreshSubscription();
 render();
+checkWeekly();
+setInterval(checkWeekly,60000);
 </script>
 </body>
 </html>

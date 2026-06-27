@@ -35,7 +35,9 @@ watermark.
 
 == STEP 1 — INGEST THE LATEST EXPORT ==
 Trigger: "When a row is added/modified" in the import staging table, OR a manual/
-scheduled run after each import.
+scheduled run after each import. (Optional: the app can also push the same CSV to
+an HTTP trigger — but ONLY when the lawyer exports, never per-entry/live. If you
+enable that, parse the CSV body and apply the exact same watermark logic below.)
 - Track the most recent "Exported At" you have already processed (store it).
 - Process only rows whose "Exported At" is newer; append them to the matching
   table (TimeLog / Meetings / Tasks). Append-only — never overwrite or de-dupe.
