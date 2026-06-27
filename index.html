@@ -179,10 +179,12 @@ function load(){
     if(!s.checkin)s.checkin={on:false,intervalMin:30,next:null};
     if(!s.timer)s.timer={clientId:null,running:false,startedAt:null,accMs:0};
     if(typeof s.activeId==="undefined")s.activeId=null;
+    if(!s.billing)s.billing={customerId:null,email:"",status:"none",active:false};
     return s;}}catch(e){}
   return{clients:[],nextAppt:"",webhook:"",steps:defaultSteps(),checkpoints:["09:00","13:00","17:00"],
     done:{},fired:{},remindersOn:false,checkin:{on:false,intervalMin:30,next:null},
-    timer:{clientId:null,running:false,startedAt:null,accMs:0},activeId:null};
+    timer:{clientId:null,running:false,startedAt:null,accMs:0},activeId:null,
+    billing:{customerId:null,email:"",status:"none",active:false}};
 }
 function save(){try{localStorage.setItem(STORE_KEY,JSON.stringify(state));}catch(e){}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -388,13 +390,72 @@ function openList(){
   document.getElementById("lSend").onclick=function(){sendAll();};
 }
 
-/* settings / webhook */
+/* ===== Billing / Stripe subscription ===== */
+var PLAN={name:"RESUITE Pro",price:"$29 / mo",
+  blurb:"Unlimited anonymous time tracking, spreadsheet sync, and the firm-side automations.",
+  features:["Unlimited clients & entries","Live timer & manual logging","Spreadsheet / Copilot sync","CSV export & calendar"]};
+function apiGet(p){return fetch(p).then(function(r){return r.json();});}
+function apiPost(p,b){return fetch(p,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b||{})}).then(function(r){return r.json();});}
+
+function openPricing(){
+  openSheet('<h3>'+PLAN.name+'</h3><div class="sub">'+PLAN.blurb+'</div>'+
+    '<div class="pvbar"><div class="p">'+PLAN.price+'</div><div class="c">secure checkout via Stripe</div></div>'+
+    PLAN.features.map(function(f){return '<div class="erow"><div>'+f+'</div><div class="eb" style="color:var(--go-d)">✓</div></div>';}).join("")+
+    '<div class="fld" style="margin-top:16px"><label>Billing email</label><input id="subEmail" type="email" placeholder="you@firm.com" value="'+escapeHtml(state.billing.email||"")+'"></div>'+
+    '<button class="sbtn" id="subGo">Subscribe</button>');
+  document.getElementById("subGo").onclick=function(){
+    var email=(document.getElementById("subEmail").value||"").trim();
+    state.billing.email=email;save();
+    var btn=document.getElementById("subGo");btn.textContent="Opening checkout…";btn.disabled=true;
+    apiPost("/api/create-checkout-session",{email:email}).then(function(d){
+      if(d&&d.url){window.location.href=d.url;}else{throw new Error((d&&d.error)||"no url");}
+    }).catch(function(){btn.textContent="Subscribe";btn.disabled=false;toast("Checkout runs on the deployed site");});
+  };
+}
+function openPortal(){
+  if(!state.billing.customerId)return openPricing();
+  toast("Opening billing…");
+  apiPost("/api/create-portal-session",{customerId:state.billing.customerId})
+    .then(function(d){if(d&&d.url)window.location.href=d.url;else throw 0;})
+    .catch(function(){toast("Billing runs on the deployed site");});
+}
+function handleCheckoutReturn(){
+  var q=new URLSearchParams(location.search);
+  if(q.get("checkout")==="success"&&q.get("session_id")){
+    apiGet("/api/checkout-session?session_id="+encodeURIComponent(q.get("session_id"))).then(function(d){
+      if(d&&d.customerId){state.billing.customerId=d.customerId;state.billing.email=d.email||state.billing.email;
+        state.billing.status=d.status;state.billing.active=!!d.active;save();
+        toast(d.active?"Subscription active 🎉":"Subscription pending");}
+    }).catch(function(){});
+    history.replaceState({},"",location.pathname);
+  }else if(q.get("checkout")==="cancel"){toast("Checkout canceled");history.replaceState({},"",location.pathname);}
+}
+function refreshSubscription(){
+  if(!state.billing.customerId)return;
+  apiGet("/api/subscription-status?customerId="+encodeURIComponent(state.billing.customerId))
+    .then(function(d){if(d&&typeof d.active!=="undefined"){state.billing.active=d.active;state.billing.status=d.status;save();}})
+    .catch(function(){});
+}
+
+/* settings: subscription + spreadsheet connection */
 function openSettings(){
-  openSheet('<h3>Spreadsheet connection</h3><div class="sub">Paste the send-to URL from the Copilot / Power Automate flow. Each entry POSTs {clientNumber, date, start, stop, minutes, points}. Leave blank to hold locally and export CSV.</div>'+
+  var b=state.billing;
+  var subLine=b.active?('Subscription · <b style="color:var(--go-d)">'+(b.status==="trialing"?"Trial":"Active")+'</b>')
+    :(b.customerId?('Subscription · '+(b.status||"inactive")):'No subscription yet');
+  var subBtn=b.customerId
+    ?'<button class="sbtn soft" id="billManage">Manage billing</button>'
+    :'<button class="sbtn" id="billSub">Subscribe to RESUITE</button>';
+  openSheet('<h3>Settings</h3>'+
+    '<div class="sub" style="margin-bottom:8px">Subscription</div>'+
+    '<div class="erow"><div>'+subLine+'</div></div>'+
+    '<div style="margin:12px 0 24px">'+subBtn+'</div>'+
+    '<div class="sub" style="margin-bottom:8px">Spreadsheet connection</div>'+
     '<div class="fld"><label>Send-to URL</label><input id="cfgUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..." autocomplete="off"></div>'+
-    '<button class="sbtn dark" id="cfgSave">Save</button>');
+    '<button class="sbtn dark" id="cfgSave">Save connection</button>');
   document.getElementById("cfgUrl").value=state.webhook||"";
   document.getElementById("cfgSave").onclick=function(){state.webhook=document.getElementById("cfgUrl").value.trim();save();closeSheet();renderSync();toast(state.webhook?"Connected":"Saved");};
+  var sb=document.getElementById("billSub");if(sb)sb.onclick=openPricing;
+  var bm=document.getElementById("billManage");if(bm)bm.onclick=openPortal;
 }
 
 /* CSV export (UNCHANGED columns/logic) */
@@ -435,6 +496,8 @@ document.getElementById("settingsBtn").onclick=openSettings;
 document.getElementById("listBtn").onclick=openList;
 document.getElementById("calBtn").onclick=openCal;
 
+handleCheckoutReturn();
+refreshSubscription();
 render();
 </script>
 </body>

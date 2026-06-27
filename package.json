@@ -1,0 +1,10 @@
+{
+  "name": "resuite-billing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RESUITE time tracking app + Stripe subscription backend",
+  "engines": { "node": "20.x" },
+  "dependencies": {
+    "stripe": "^17.5.0"
+  }
+}
