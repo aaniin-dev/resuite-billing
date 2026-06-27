@@ -131,6 +131,19 @@
     transition:.25s;z-index:90;pointer-events:none;max-width:90%}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  .cmodal{position:fixed;inset:0;background:rgba(20,28,45,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:26px}
+  .cmodal.show{display:flex}
+  .cbox{background:#fff;border-radius:20px;padding:26px 22px;max-width:340px;width:100%;text-align:center}
+  .ceye{width:54px;height:54px;border-radius:50%;background:var(--chip);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .ceye svg{width:26px;height:26px;stroke:var(--accent);stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .ctitle{font-size:20px;font-weight:600}
+  .csub{font-size:14px;color:var(--muted);margin-top:6px;line-height:1.5}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
+  .chip{border:1px solid var(--line2);border-radius:30px;padding:10px 14px;font-size:14px;font-weight:500;background:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .chip.done{background:#eef7f1;border-color:#cfe9da;color:var(--go-d)}
+  .chip svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.8;fill:none}
+
   /* calendar */
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .cal-nav{background:var(--chip);border:none;width:38px;height:38px;border-radius:10px;font-size:18px;cursor:pointer;color:var(--ink)}
@@ -161,6 +174,13 @@
 
 <!-- bottom sheet host -->
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="cmodal" id="chkScrim"><div class="cbox">
+  <div class="ceye"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+  <div class="ctitle" id="chkTitle">Still working?</div>
+  <div class="csub" id="chkSub"></div>
+  <button class="sbtn" id="chkGo" style="margin-top:18px">Yes, keep going</button>
+  <button class="sbtn soft" id="chkStop" style="margin-top:10px">Pause timer</button>
+</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -176,13 +196,15 @@ function load(){
     if(!s.steps)s.steps=defaultSteps();
     if(!s.checkpoints)s.checkpoints=["09:00","13:00","17:00"];
     if(!s.done)s.done={};if(!s.fired)s.fired={};
-    if(!s.checkin)s.checkin={on:false,intervalMin:30,next:null};
+    if(!s.checkin)s.checkin={on:true,intervalMin:15};
+    if(typeof s.checkin.intervalMin!=="number")s.checkin.intervalMin=15;
+    if(!s.log)s.log=[];
     if(!s.timer)s.timer={clientId:null,running:false,startedAt:null,accMs:0};
     if(typeof s.activeId==="undefined")s.activeId=null;
     if(!s.billing)s.billing={customerId:null,email:"",status:"none",active:false};
     return s;}}catch(e){}
   return{clients:[],nextAppt:"",webhook:"",steps:defaultSteps(),checkpoints:["09:00","13:00","17:00"],
-    done:{},fired:{},remindersOn:false,checkin:{on:false,intervalMin:30,next:null},
+    done:{},fired:{},remindersOn:false,checkin:{on:true,intervalMin:15},log:[],
     timer:{clientId:null,running:false,startedAt:null,accMs:0},activeId:null,
     billing:{customerId:null,email:"",status:"none",active:false}};
 }
@@ -197,6 +219,16 @@ function clientHours(c){return c.entries.reduce(function(s,e){return s+e.tenths;
 function pendingCount(){var n=0;state.clients.forEach(function(c){c.entries.forEach(function(e){if(!e.sent)n++;});});return n;}
 function pad(x){return(x<10?"0":"")+x;}
 function todayKey(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
+function isoToday(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+function hhmmNow(){var d=new Date();return pad(d.getHours())+":"+pad(d.getMinutes());}
+function hmDur(min){min=Math.round(min);return(min>=60?Math.floor(min/60)+"h ":"")+(min%60)+"m";}
+/* Follow-up hand-offs — coded only, no names/content ever sent */
+var FOLLOWCATS=[{k:"followup",label:"Follow up",code:5},{k:"email",label:"Email",code:2},{k:"documents",label:"Documents",code:1},{k:"signatures",label:"Signatures",code:3},{k:"admin",label:"Admin",code:4}];
+function postAction(obj){
+  state.log.push({at:Date.now(),obj:obj,sent:!state.webhook?false:false});
+  if(state.webhook){postJSON(obj).then(function(){var l=state.log[state.log.length-1];if(l)l.sent=true;save();}).catch(function(){});}
+  save();
+}
 function escapeHtml(s){return(s||"").replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
 function toast(m){var t=document.getElementById("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove("show");},1800);}
 
@@ -256,7 +288,8 @@ function renderMain(){
       '<button class="side stop" id="btnStop" title="Stop & save"'+(hasTime?"":" disabled")+'><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>'+
     '</div>'+
     '<div class="quiet">'+
-      '<button id="qManual"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Add manually</button>'+
+      '<button id="qFollow"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Follow-up</button>'+
+      '<button id="qManual"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Add time</button>'+
       '<button id="qNew"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New client</button>'+
     '</div>'+
   '</div>';
@@ -264,6 +297,7 @@ function renderMain(){
   document.getElementById("btnSwitch").onclick=openSwitch;
   document.getElementById("btnPlay").onclick=togglePlay;
   document.getElementById("btnStop").onclick=function(){stopTimer(true);};
+  document.getElementById("qFollow").onclick=openFollow;
   document.getElementById("qManual").onclick=openManual;
   document.getElementById("qNew").onclick=function(){goIntake();};
   startTick();
@@ -285,6 +319,10 @@ function startTick(){
     var ms=t.clientId===c.id?elapsedMs():0;
     var td=document.getElementById("timerDisp");if(td)td.innerHTML=fmtTimer(ms);
     var pn=document.getElementById("ptsNow");if(pn)pn.textContent=minutesToTenths(Math.ceil(ms/60000)).toFixed(1);
+    if(t.running&&state.checkin&&state.checkin.on){
+      var iv=state.checkin.intervalMin||15,idx=Math.floor((ms/60000)/iv);
+      if(idx>=1&&idx!==(t.chkIdx||0)){t.chkIdx=idx;save();fireCheckIn(ms);}
+    }
   },1000);
 }
 
@@ -452,6 +490,9 @@ function openSettings(){
     '<div class="sub" style="margin-bottom:8px">Subscription</div>'+
     '<div class="erow"><div>'+subLine+'</div></div>'+
     '<div style="margin:12px 0 24px">'+subBtn+'</div>'+
+    '<div class="sub" style="margin-bottom:8px">Check-in reminder ("Are you still working?")</div>'+
+    '<div class="seg" id="chkSeg">'+["off","15","30","45","60"].map(function(v){var on=(v==="off"?!state.checkin.on:(state.checkin.on&&String(state.checkin.intervalMin)===v));return '<button data-iv="'+v+'"'+(on?' class="on"':'')+'>'+(v==="off"?"Off":v+"m")+'</button>';}).join("")+'</div>'+
+    '<div class="hint" style="font-size:12px;color:var(--muted);margin:-8px 0 22px">A gentle pop-up while the timer runs, so time never logs against the wrong matter.</div>'+
     '<div class="sub" style="margin-bottom:8px">Spreadsheet connection</div>'+
     '<div class="fld"><label>Send-to URL</label><input id="cfgUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..." autocomplete="off"></div>'+
     '<button class="sbtn dark" id="cfgSave">Save connection</button>');
@@ -459,6 +500,13 @@ function openSettings(){
   document.getElementById("cfgSave").onclick=function(){state.webhook=document.getElementById("cfgUrl").value.trim();save();closeSheet();renderSync();toast(state.webhook?"Connected":"Saved");};
   var sb=document.getElementById("billSub");if(sb)sb.onclick=openPricing;
   var bm=document.getElementById("billManage");if(bm)bm.onclick=openPortal;
+  sheet.querySelectorAll("#chkSeg [data-iv]").forEach(function(el){el.onclick=function(){
+    var v=el.getAttribute("data-iv");
+    if(v==="off"){state.checkin.on=false;}else{state.checkin.on=true;state.checkin.intervalMin=parseInt(v,10);}
+    state.timer.chkIdx=0;save();
+    sheet.querySelectorAll("#chkSeg [data-iv]").forEach(function(x){x.classList.toggle("on",x===el);});
+    toast(v==="off"?"Reminders off":"Reminder every "+v+" min");
+  };});
 }
 
 /* CSV export (UNCHANGED columns/logic) */
@@ -493,6 +541,39 @@ function renderCal(){
   document.getElementById("cNext").onclick=function(){calView.setMonth(calView.getMonth()+1);renderCal();};
   sheet.querySelectorAll("[data-day]").forEach(function(el){el.onclick=function(){var k=el.getAttribute("data-day");if(map[k]){calSel=k;renderCal();}};});
 }
+
+/* ===== Follow-up: next meeting + hand-offs (Email/Docs/Signatures/Admin) ===== */
+function openFollow(){
+  var c=activeClient();if(!c)return;
+  openSheet('<h3>Follow-up</h3><div class="sub">Log next steps for Client #'+escapeHtml(c.number)+'. Codes only — no names or notes are sent.</div>'+
+    '<div class="sub" style="margin:2px 0 8px;color:var(--ink);font-weight:500">Hand off / send</div>'+
+    '<div class="chips" id="followChips">'+FOLLOWCATS.map(function(f){return '<button class="chip" data-cat="'+f.code+'" data-k="'+f.k+'"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>'+f.label+'</button>';}).join("")+'</div>'+
+    '<div class="sub" style="margin:18px 0 8px;color:var(--ink);font-weight:500">Next meeting</div>'+
+    '<div class="frow"><div class="fld"><label>Date</label><input id="nmDate" type="date"></div><div class="fld"><label>Time</label><input id="nmTime" type="time"></div></div>'+
+    '<button class="sbtn dark" id="nmSave">Save next meeting</button>');
+  sheet.querySelectorAll("[data-cat]").forEach(function(el){el.onclick=function(){
+    var code=parseInt(el.getAttribute("data-cat"),10);
+    postAction({type:"task",clientNumber:c.number,date:isoToday(),time:hhmmNow(),category:code});
+    el.classList.add("done");toast("Logged "+el.getAttribute("data-k")+" for #"+c.number);
+  };});
+  document.getElementById("nmSave").onclick=function(){
+    var d=document.getElementById("nmDate").value,tm=document.getElementById("nmTime").value;
+    if(!d){toast("Pick a date");return;}
+    postAction({type:"meeting",clientNumber:c.number,date:d,time:tm||""});
+    closeSheet();toast("Next meeting saved for #"+c.number);
+  };
+}
+
+/* ===== Check-in reminder ("Are you still working?") ===== */
+function fireCheckIn(ms){
+  document.getElementById("chkSub").innerHTML="";
+  var c=activeClient();
+  document.getElementById("chkTitle").textContent="Still working?";
+  document.getElementById("chkSub").innerHTML=(c?"Client #<b>"+escapeHtml(c.number)+"</b> · ":"")+hmDur(ms/60000)+" tracked so far.";
+  document.getElementById("chkScrim").classList.add("show");
+}
+document.getElementById("chkGo").onclick=function(){document.getElementById("chkScrim").classList.remove("show");};
+document.getElementById("chkStop").onclick=function(){document.getElementById("chkScrim").classList.remove("show");pauseTimer();};
 
 /* top-bar wiring */
 document.getElementById("settingsBtn").onclick=openSettings;
