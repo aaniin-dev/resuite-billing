@@ -683,7 +683,13 @@ function startApp(){
   document.querySelector(".bar").style.display="";
   handleCheckoutReturn();refreshSubscription();render();checkWeekly();
 }
-function authGate(){ if(!getUser())return showAuth("signup"); if(!isLoggedIn())return showAuth("signin"); startApp(); }
+function authGate(){
+  if(isLoggedIn()&&getUser())return startApp();
+  var q=new URLSearchParams(location.search);
+  if(q.get("login"))return showAuth("signin");
+  if(q.get("signup"))return showAuth("signup");
+  return showAuth(getUser()?"signin":"signup");
+}
 setInterval(function(){if(isLoggedIn())checkWeekly();},60000);
 authGate();
 </script>
