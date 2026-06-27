@@ -37,6 +37,20 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the follow-on features (meetings,
 deadlines, tasks, reminders) and [`docs/resuite-datasets-prompt.md`](docs/resuite-datasets-prompt.md)
 for the full data layer (decoder tables, document template, connection map).
 
+## Current state & developer handoff
+
+The live auto-connection is **not built yet**. Today the app is an internal data
+holder with a manual bridge: log entries → **⬇ Export CSV** → import into the
+blank workbook [`templates/RESUITE Hours Log.xlsx`](templates/RESUITE%20Hours%20Log.xlsx)
+→ Copilot reads it. That template has the `TimeLog` table, the
+`ROUNDUP(Minutes/6,0)/10` check column, and a Summary sheet (values populate when
+opened in Excel/Copilot).
+
+To make the connection automatic, the full developer spec is in
+[`docs/connective-brief-for-jordan.md`](docs/connective-brief-for-jordan.md) —
+it covers the webhook vs. Graph API choice, how Microsoft auth actually works,
+the data contract, security, and a definition of done.
+
 ## Privacy contract
 
 | Travels off the phone | Stays firm-side |
