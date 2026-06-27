@@ -197,15 +197,15 @@ function load(){
     if(!s.steps)s.steps=defaultSteps();
     if(!s.checkpoints)s.checkpoints=["09:00","13:00","17:00"];
     if(!s.done)s.done={};if(!s.fired)s.fired={};
-    if(!s.checkin)s.checkin={on:true,intervalMin:15};
-    if(typeof s.checkin.intervalMin!=="number")s.checkin.intervalMin=15;
+    if(!s.checkin)s.checkin={on:true,intervalMin:30};
+    if(typeof s.checkin.intervalMin!=="number")s.checkin.intervalMin=30;
     if(!s.log)s.log=[];
     if(!s.timer)s.timer={clientId:null,running:false,startedAt:null,accMs:0};
     if(typeof s.activeId==="undefined")s.activeId=null;
     if(!s.billing)s.billing={customerId:null,email:"",status:"none",active:false};
     return s;}}catch(e){}
   return{clients:[],nextAppt:"",webhook:"",steps:defaultSteps(),checkpoints:["09:00","13:00","17:00"],
-    done:{},fired:{},remindersOn:false,checkin:{on:true,intervalMin:15},log:[],
+    done:{},fired:{},remindersOn:false,checkin:{on:true,intervalMin:30},log:[],
     timer:{clientId:null,running:false,startedAt:null,accMs:0},activeId:null,
     billing:{customerId:null,email:"",status:"none",active:false}};
 }
@@ -321,7 +321,7 @@ function startTick(){
     var td=document.getElementById("timerDisp");if(td)td.innerHTML=fmtTimer(ms);
     var pn=document.getElementById("ptsNow");if(pn)pn.textContent=minutesToTenths(Math.ceil(ms/60000)).toFixed(1);
     if(t.running&&state.checkin&&state.checkin.on){
-      var iv=state.checkin.intervalMin||15,idx=Math.floor((ms/60000)/iv);
+      var iv=state.checkin.intervalMin||30,idx=Math.floor((ms/60000)/iv);
       if(idx>=1&&idx!==(t.chkIdx||0)){t.chkIdx=idx;save();fireCheckIn(ms);}
     }
   },1000);
@@ -492,8 +492,8 @@ function openSettings(){
     '<div class="erow"><div>'+subLine+'</div></div>'+
     '<div style="margin:12px 0 24px">'+subBtn+'</div>'+
     '<div class="sub" style="margin-bottom:8px">Check-in reminder ("Are you still working?")</div>'+
-    '<div class="seg" id="chkSeg">'+["off","15","30","45","60"].map(function(v){var on=(v==="off"?!state.checkin.on:(state.checkin.on&&String(state.checkin.intervalMin)===v));return '<button data-iv="'+v+'"'+(on?' class="on"':'')+'>'+(v==="off"?"Off":v+"m")+'</button>';}).join("")+'</div>'+
-    '<div class="hint" style="font-size:12px;color:var(--muted);margin:-8px 0 22px">A gentle pop-up while the timer runs, so time never logs against the wrong matter.</div>'+
+    '<div class="seg" id="chkSeg">'+["off","5","15","30","45"].map(function(v){var on=(v==="off"?!state.checkin.on:(state.checkin.on&&String(state.checkin.intervalMin)===v));return '<button data-iv="'+v+'"'+(on?' class="on"':'')+'>'+(v==="off"?"Off":v+"m"+(v==="30"?'<span style="font-size:9px;opacity:.65"> rec</span>':""))+'</button>';}).join("")+'</div>'+
+    '<div class="hint" style="font-size:12px;color:var(--muted);margin:-8px 0 22px">30 min recommended. A gentle pop-up while the timer runs; no response in 3 min auto-pauses it.</div>'+
     '<div class="sub" style="margin-bottom:8px">Spreadsheet connection</div>'+
     '<div class="fld"><label>Send-to URL</label><input id="cfgUrl" type="url" placeholder="https://prod-xx.logic.azure.com/..." autocomplete="off"></div>'+
     '<button class="sbtn dark" id="cfgSave">Save connection</button>');
