@@ -18,7 +18,7 @@ who's subscribed — there's no separate database to maintain.
 
 1. **Create the product + price**
    Stripe Dashboard → Product catalog → **Add product** (e.g. "RESUITE Pro") →
-   add a **recurring** price (e.g. $29 / month) → copy the **price ID** (`price_…`).
+   add a **recurring** price ($10 / month) → copy the **price ID** (`price_…`).
    Keep the app's display price (`PLAN` in `index.html`) in sync with this.
 
 2. **Get your secret key**
