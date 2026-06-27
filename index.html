@@ -686,7 +686,9 @@ function doSignin(){
 }
 function startApp(){
   document.querySelector(".bar").style.display="";
-  handleCheckoutReturn();refreshSubscription();render();checkWeekly();
+  handleCheckoutReturn();
+  if(location.search)history.replaceState({},"",location.pathname); // drop ?signup/?login so sign-out returns to sign-in
+  refreshSubscription();render();checkWeekly();
 }
 function authGate(){
   if(isLoggedIn()&&getUser())return startApp();
