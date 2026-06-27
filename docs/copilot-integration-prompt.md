@@ -25,7 +25,9 @@ by client number.
 
 == THE EXPORT FILE (the input) ==
 One row per action, with these columns:
-  Type | Client Number | Date | Start | Stop | Minutes | Points | Time | Category | Exported At
+  Type | Client Number | Date | Start | Stop | Minutes | Points | Time | Category | Exported At | Logged By
+("Logged By" is the timekeeper's login email — a firm user, NOT the client. Use it
+to attribute hours; it is never a client identifier.)
 Types:
   time     -> Date, Start, Stop, Minutes, Points
   meeting  -> Date (the NEXT appointment date), Time
