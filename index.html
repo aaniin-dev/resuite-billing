@@ -521,16 +521,20 @@ function csvCell(v){v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')
 function isoFull(ts){var d=new Date(ts);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes());}
 function downloadCSV(csv,name){var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=name+".csv";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);}
 function exportCSV(recap){
-  var now=Date.now(),stamp=isoFull(now);
-  var rows=[["Type","Client Number","Date","Start","Stop","Minutes","Points","Time","Category","Exported At"]];
+  var now=Date.now(),stamp=isoFull(now),by=(getUser()||{}).email||"";
+  // Columns mirror the RESUITE Hours Log: App Number (anonymous, from app) + Client Number (firm assigns)
+  var rows=[["Type","App Number","Client Number","Date","Start","Stop","Minutes","Points","Time","Category","Exported At","Logged By"]];
+  var events=[]; // per-event JSON for the Copilot Intake flow
   state.clients.forEach(function(c){c.entries.slice().sort(function(a,b){return a.at-b.at;}).forEach(function(e){
-    rows.push(["time",c.number,new Date(e.at).toISOString().slice(0,10),e.start||"",e.end||"",Math.round(e.minutes),e.tenths.toFixed(1),"","",stamp]);e.exportedAt=now;});});
+    var date=new Date(e.at).toISOString().slice(0,10),mins=Math.round(e.minutes);
+    rows.push(["time",c.number,"",date,e.start||"",e.end||"",mins,e.tenths.toFixed(1),"","",stamp,by]);
+    events.push({type:"time",appNumber:c.number,clientNumber:"",date:date,start:e.start||"",stop:e.end||"",minutes:mins,points:e.tenths});
+    e.exportedAt=now;});});
   (state.log||[]).slice().sort(function(a,b){return a.at-b.at;}).forEach(function(l){var o=l.obj||{};
-    if(o.type==="meeting")rows.push(["meeting",o.clientNumber||"",o.date||"","","","","",o.time||"","",stamp]);
-    else if(o.type==="task")rows.push(["task",o.clientNumber||"",o.date||"","","","","",o.time||"",o.category||"",stamp]);
-    else rows.push([o.type||"action",o.clientNumber||"",o.date||"","","","","",o.time||"",(o.category||o.stepId||""),stamp]);
-    l.exportedAt=now;});
-  var by=(getUser()||{}).email||"";rows[0].push("Logged By");for(var ri=1;ri<rows.length;ri++)rows[ri].push(by);
+    if(o.type==="nextMeeting")rows.push(["nextMeeting",o.appNumber||"",o.clientNumber||"",o.date||"","","","","",o.time||"","",stamp,by]);
+    else if(o.type==="task")rows.push(["task",o.appNumber||"",o.clientNumber||"",o.date||"","","","","",o.time||"",o.category||"",stamp,by]);
+    else rows.push([o.type||"action",o.appNumber||"",o.clientNumber||"",o.date||"","","","","",o.time||"",(o.category||o.stepId||""),stamp,by]);
+    events.push(o);l.exportedAt=now;});
   var csv=rows.map(function(r){return r.map(csvCell).join(",");}).join("\r\n");
   var fname="resuite-export-"+new Date().toISOString().slice(0,10);
   downloadCSV(csv,fname);
@@ -538,8 +542,9 @@ function exportCSV(recap){
   state.archives=state.archives||[];
   state.archives.unshift({at:now,label:new Date(now).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}),rows:rows.length-1,csv:csv,fname:fname,recap:recap||"",sent:false});
   if(state.archives.length>26)state.archives.pop();
-  // Safeguarded connection: only sends on export (never automatically); copy already kept
-  if(state.copilotUrl){fetch(state.copilotUrl,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:csv}).then(function(){var a0=state.archives[0];if(a0)a0.sent=true;save();}).catch(function(){});}
+  // Safeguarded connection: only sends on export (never automatically). Posts each event
+  // as JSON matching the Copilot Intake schema {type, appNumber, clientNumber, ...}.
+  if(state.copilotUrl){events.forEach(function(ev){fetch(state.copilotUrl,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(ev)}).catch(function(){});});var a0=state.archives[0];if(a0)a0.sent=true;}
   state.lastExport=now;save();renderSync();
   toast("Exported "+(rows.length-1)+" rows · copy saved"+(state.copilotUrl?" + sent":""));
 }
@@ -577,13 +582,13 @@ function openFollow(){
     '<button class="sbtn dark" id="nmSave">Save next meeting</button>');
   sheet.querySelectorAll("[data-cat]").forEach(function(el){el.onclick=function(){
     var code=parseInt(el.getAttribute("data-cat"),10);
-    postAction({type:"task",clientNumber:c.number,date:isoToday(),time:hhmmNow(),category:code});
+    postAction({type:"task",appNumber:c.number,clientNumber:"",date:isoToday(),time:hhmmNow(),category:code});
     el.classList.add("done");toast("Logged "+el.getAttribute("data-k")+" for #"+c.number);
   };});
   document.getElementById("nmSave").onclick=function(){
     var d=document.getElementById("nmDate").value,tm=document.getElementById("nmTime").value;
     if(!d){toast("Pick a date");return;}
-    postAction({type:"meeting",clientNumber:c.number,date:d,time:tm||""});
+    postAction({type:"nextMeeting",appNumber:c.number,clientNumber:"",date:d,time:tm||""});
     closeSheet();toast("Next meeting saved for #"+c.number);
   };
 }
