@@ -391,7 +391,8 @@ function openList(){
 }
 
 /* ===== Billing / Stripe subscription ===== */
-var PLAN={name:"RESUITE Pro",price:"$10 / mo",
+var FREE=true;
+var PLAN={name:"RESUITE Pro",price:"Free while in beta",
   blurb:"Unlimited anonymous time tracking, spreadsheet sync, and the firm-side automations.",
   features:["Unlimited clients & entries","Live timer & manual logging","Spreadsheet / Copilot sync","CSV export & calendar"]};
 function apiGet(p){return fetch(p).then(function(r){return r.json();});}
@@ -440,11 +441,13 @@ function refreshSubscription(){
 /* settings: subscription + spreadsheet connection */
 function openSettings(){
   var b=state.billing;
-  var subLine=b.active?('Subscription · <b style="color:var(--go-d)">'+(b.status==="trialing"?"Trial":"Active")+'</b>')
-    :(b.customerId?('Subscription · '+(b.status||"inactive")):'No subscription yet');
-  var subBtn=b.customerId
+  var subLine=FREE?'<b style="color:var(--go-d)">Free</b> while in beta — no payment needed'
+    :(b.active?('Subscription · <b style="color:var(--go-d)">'+(b.status==="trialing"?"Trial":"Active")+'</b>')
+    :(b.customerId?('Subscription · '+(b.status||"inactive")):'No subscription yet'));
+  var subBtn=FREE?''
+    :(b.customerId
     ?'<button class="sbtn soft" id="billManage">Manage billing</button>'
-    :'<button class="sbtn" id="billSub">Subscribe to RESUITE</button>';
+    :'<button class="sbtn" id="billSub">Subscribe to RESUITE</button>');
   openSheet('<h3>Settings</h3>'+
     '<div class="sub" style="margin-bottom:8px">Subscription</div>'+
     '<div class="erow"><div>'+subLine+'</div></div>'+
