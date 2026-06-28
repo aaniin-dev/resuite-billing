@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
 
     const portal = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: origin + "/",
+      return_url: origin + "/app",
     });
 
     res.status(200).json({ url: portal.url });

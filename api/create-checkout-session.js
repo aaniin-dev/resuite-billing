@@ -19,8 +19,8 @@ module.exports = async (req, res) => {
       customer_email: email || undefined,
       allow_promotion_codes: true,
       subscription_data: trial ? { trial_period_days: trial } : undefined,
-      success_url: origin + "/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: origin + "/?checkout=cancel",
+      success_url: origin + "/app?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+      cancel_url: origin + "/app?checkout=cancel",
     });
 
     res.status(200).json({ url: session.url });
